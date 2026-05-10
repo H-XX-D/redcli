@@ -99,6 +99,58 @@ def mark_read(item_ids: tuple[str, ...], all_unread: bool) -> None:
     out.console.print(f"[green]✓[/green] marked {len(items)} item(s) read")
 
 
+@inbox_group.command("watch")
+@click.option(
+    "--mark-read/--no-mark-read",
+    default=False,
+    show_default=True,
+    help="Mark each item read as it arrives.",
+)
+@click.option(
+    "--on-arrival",
+    default=None,
+    help=(
+        "Shell command to fire on each new item. "
+        "$REDDI_ITEM_ID is set in the env. "
+        "Example: --on-arrival 'tput bel'"
+    ),
+)
+def watch_inbox(mark_read: bool, on_arrival: str | None) -> None:
+    """Live-stream new inbox items as they arrive (Ctrl-C to stop).
+
+    \b
+    Uses Reddit's long-poll inbox stream. New replies, mentions, and PMs
+    print to your terminal in real time. Useful during a launch when you
+    want comments to surface as they happen rather than checking the inbox
+    every minute.
+
+    \b
+    Examples:
+      reddi inbox watch
+      reddi inbox watch --mark-read
+      reddi inbox watch --on-arrival "tput bel"   # ring terminal bell
+    """
+    import subprocess
+
+    reddit = auth.get_authed_reddit()
+    out.info("watching inbox stream — Ctrl-C to stop\n")
+    try:
+        for item in reddit.inbox.stream(skip_existing=True):
+            kind = _item_type(item)
+            author = item.author.name if item.author else "[reddit]"
+            sub = getattr(item, "subreddit", None) and item.subreddit.display_name
+            sub_str = f" r/{sub}" if sub else ""
+            out.console.print(
+                f"[cyan]{kind:>7}[/cyan]  [bold]{author}[/bold]{sub_str}  {_subject(item)[:80]}"
+            )
+            if mark_read:
+                item.mark_read()
+            if on_arrival:
+                subprocess.run(on_arrival, shell=True, env={"REDDI_ITEM_ID": item.id})  # noqa: S602
+    except KeyboardInterrupt:
+        out.info("\nstopped")
+
+
 def _item_type(item) -> str:  # noqa: ANN001
     """Distinguish comment-reply vs username-mention vs private-message."""
     cls = type(item).__name__

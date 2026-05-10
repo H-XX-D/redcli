@@ -38,7 +38,7 @@ DEFAULT_SCOPES = [
     "mysubreddits",
 ]
 
-USER_AGENT = "reddi/1.0 (https://github.com/H-XX-D/reddi)"
+USER_AGENT = "reddi/1.1 (https://github.com/H-XX-D/reddi)"
 CONFIG_DIR = Path(os.environ.get("REDDI_CONFIG_DIR", Path.home() / ".config" / "reddi"))
 CREDENTIALS_PATH = CONFIG_DIR / "credentials.json"
 

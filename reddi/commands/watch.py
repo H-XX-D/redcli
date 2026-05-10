@@ -1,7 +1,8 @@
-"""`reddi watch` — live-update post stats."""
+"""`reddi watch` — live-update post stats with optional state-transition hooks."""
 
 from __future__ import annotations
 
+import subprocess
 import time
 from datetime import datetime
 
@@ -28,11 +29,44 @@ from .status import _extract_submission_id
     is_flag=True,
     help="Refresh once and exit (useful for cron / scripted polling).",
 )
-def watch(post_url_or_id: str, interval: int, once: bool) -> None:
+@click.option(
+    "--on-removal",
+    default=None,
+    help=(
+        "Shell command to fire when the post is removed (mod or AutoMod). "
+        "$REDDI_POST_URL is set in the env. "
+        "Example: --on-removal 'tput bel'"
+    ),
+)
+@click.option(
+    "--on-locked",
+    default=None,
+    help="Shell command to fire when the post becomes locked.",
+)
+def watch(
+    post_url_or_id: str,
+    interval: int,
+    once: bool,
+    on_removal: str | None,
+    on_locked: str | None,
+) -> None:
     """Live-update vote/comment stats for a post.
 
+    \b
     Useful during a launch — pin to a second monitor and watch the post grow
     (or not) in real time. Press Ctrl-C to stop.
+
+    \b
+    The --on-removal / --on-locked hooks fire a shell command exactly once
+    when the post transitions into that state. The post URL is available
+    in $REDDI_POST_URL when the hook runs.
+
+    \b
+    Examples:
+      reddi watch <url>
+      reddi watch <url> --interval 120
+      reddi watch <url> --on-removal 'osascript -e "display notification \\"removed\\""'
+      reddi watch <url> --on-locked  'curl -X POST $SLACK_WEBHOOK -d ...'
     """
     if interval < 30 and not once:
         out.warn("interval < 30s may hit Reddit rate limits; clamped to 30s")
@@ -41,11 +75,29 @@ def watch(post_url_or_id: str, interval: int, once: bool) -> None:
     sid = _extract_submission_id(post_url_or_id)
     reddit = auth.get_authed_reddit()
 
+    last_state = {"removed": False, "locked": False, "url": None}
+
     def snapshot() -> Table:
         s = reddit.submission(id=sid)
         # Force a refresh on every poll
         s._fetched = False  # type: ignore[attr-defined]  # PRAW internal
         s._fetch()  # type: ignore[attr-defined]
+
+        url = f"https://reddit.com{s.permalink}"
+        is_removed = getattr(s, "removed_by_category", None) is not None
+        is_locked = bool(s.locked)
+
+        # Fire transition hooks (exactly once on transition)
+        if is_removed and not last_state["removed"] and on_removal:
+            out.console.print("[red]![/red] post removed — firing on_removal hook")
+            subprocess.run(on_removal, shell=True, env={"REDDI_POST_URL": url})  # noqa: S602
+        if is_locked and not last_state["locked"] and on_locked:
+            out.console.print("[yellow]![/yellow] post locked — firing on_locked hook")
+            subprocess.run(on_locked, shell=True, env={"REDDI_POST_URL": url})  # noqa: S602
+        last_state["removed"] = is_removed
+        last_state["locked"] = is_locked
+        last_state["url"] = url
+
         t = Table(show_header=False, box=None)
         t.add_column(style="bold cyan")
         t.add_column()

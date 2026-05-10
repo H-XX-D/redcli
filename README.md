@@ -1,19 +1,28 @@
 # reddi
 
-A modern command-line client for Reddit. Built for the **launch / monitor / engage** loop: write a post, watch it live, reply to comments, crosspost to the next sub — all from your shell.
+**Turns the Reddit launch loop from 90 minutes of tab-switching into 20 minutes of terminal commands.** Built for indie devs, marketers, mods, and bot operators who post on Reddit regularly. `reddi post`, `reddi watch`, `reddi inbox list`, `reddi comment`, `reddi crosspost`, `reddi launch` — composable, scriptable, dry-runnable.
 
 ```text
-status:    v1.0.0 — production / stable
+status:    v1.1.0 — production / stable
 license:   MIT
 runtime:   python 3.9+
 ergonomics: gh-style
 ```
 
-## Why reddi exists
+Other Reddit CLIs (`rtv`, `tuir`, `reddix`, `rdt-cli`) optimize for *browsing without a browser*. **reddi optimizes for acting on Reddit efficiently from your shell** — different goal, different design.
 
-If you launch products on Reddit, you're stuck in a tab-switching loop: paste post into one sub, watch the upvote count, switch to the next sub for a tailored variant, refresh inbox for replies, draft a comment, paste, repeat. The browser is fine for casual reading but terrible for that workflow.
+## What that means concretely
 
-The tools that used to help with this — Apollo, Reddit is Fun, `rtv`, `tuir` — mostly died after Reddit's 2023 API pricing change. `reddi` is the small, stable, MIT-licensed tool that fills the gap: just the slice of Reddit that survives nicely on the API, optimized for indie devs, marketers, mods, and bot operators who already live in the terminal.
+| Workflow step | Browser | reddi |
+|---|---|---|
+| Lint a post before submitting | not possible | `reddi post ... --dry-run --json` |
+| Monitor a post live | refresh every 30s | `reddi watch <url>` |
+| Reply to a comment | tab → click → click → type → submit | `reddi comment <url> --body-file reply.md` |
+| Crosspost with new title | open post → click crosspost → edit → submit | `reddi crosspost <url> --to MacApps --title "..."` |
+| Launch 5 subs over 6 hours | 5 manual rounds | `reddi launch launch.json` (declarative, runs unattended) |
+| Detect post removal | refresh, look for "[removed]" | `reddi watch <url> --on-removal "notify-send 'removed'"` |
+| Stream new inbox replies live | F5 the inbox | `reddi inbox watch` |
+| Find your removed posts | scroll your profile | `reddi history --json \| jq '.[] \| select(.removed)'` |
 
 ## Install
 
@@ -48,40 +57,75 @@ Then:
 reddi auth login --client-id YOUR_CLIENT_ID
 ```
 
-A browser window opens, you approve the scopes, and `reddi` saves a refresh token to `~/.config/reddi/credentials.json` (mode 0600). One-time setup; you won't need to log in again until you `reddi auth logout`.
+A browser window opens, you approve the scopes, and `reddi` saves a refresh token to `~/.config/reddi/credentials.json` (mode 0600).
+
+Enable shell tab-completion (optional, recommended):
+
+```sh
+# bash
+eval "$(reddi completion bash)"
+
+# zsh
+eval "$(reddi completion zsh)"
+
+# fish
+reddi completion fish | source
+```
+
+After this, `reddi <TAB>` completes commands; `reddi auth <TAB>` completes subcommands.
 
 ## The launch workflow
 
-This is what reddi is built for. The full loop in five commands:
+This is what reddi is built for. The full loop in seven commands:
 
 ```sh
 # 1. Find the right flair before posting
 reddi flairs SideProject
 
-# 2. Submit the post
-reddi post --sub SideProject \
-  --title "I built reddi: a modern Reddit CLI" \
-  --body-file post.md \
+# 2. Lint the post (dry-run, no submission)
+reddi post --sub SideProject --title "I built reddi" --body-file post.md --dry-run
+
+# 3. Submit it
+reddi post --sub SideProject --title "I built reddi" --body-file post.md \
   --flair-id <id-from-step-1>
 
-# 3. Watch how it does, live
-reddi watch <post-url> --interval 60
+# 4. Watch it live, with a notification on removal
+reddi watch <post-url> --interval 60 \
+  --on-removal "osascript -e 'display notification \"reddi post removed\"'"
 
-# 4. Read inbox replies as they come in
-reddi inbox list
+# 5. Stream inbox replies as they arrive
+reddi inbox watch --mark-read
 
-# 5. Reply to a specific comment
+# 6. Reply to a specific comment
 reddi comment <comment-url> --body "thanks for trying it!"
 
-# 6. Crosspost to the next sub with a tailored title
+# 7. Crosspost to the next sub with a tailored title
 reddi crosspost <post-url> --to MacApps \
   --title "[reddi] CLI for managing Reddit launches"
 ```
 
-Every command takes `--json` for scripting:
+Or declare the whole thing as JSON and let reddi orchestrate:
 
 ```sh
-reddi status <post-url> --json | jq '.score'
+reddi launch ~/launches/reddi/config.json
+```
+
+Where `config.json` is:
+
+```json
+{
+  "name": "reddi v1.1 launch",
+  "stages": [
+    {"sub": "SideProject", "title": "I built reddi", "body_file": "post-sideproject.md"},
+    {"sub": "MacApps",     "title": "[reddi] CLI for Reddit launches", "body_file": "post-macapps.md", "delay_seconds": 7200},
+    {"sub": "ObsidianMD",  "title": "reddi: pipe Reddit ops through your vault", "body_file": "post-obsidian.md", "delay_seconds": 86400}
+  ],
+  "watch_after": true,
+  "watch_duration_seconds": 86400,
+  "watch_interval_seconds": 300,
+  "on_removal": "osascript -e 'display notification \"reddi post removed\"'",
+  "on_locked":  "tput bel"
+}
 ```
 
 ## Full command reference
@@ -92,12 +136,15 @@ reddi auth status          show current auth state
 reddi auth logout          remove stored credentials
 
 reddi me                   show your account info
+reddi history              list your own recent submissions
 
 reddi post                 submit a text or link post (--dry-run supported)
 reddi status <url>         vote/comment/removed-state for a post
-reddi watch <url>          live-updating dashboard
+reddi watch  <url>         live-updating dashboard
+                           --on-removal / --on-locked fire shell hooks
 
 reddi inbox list           list inbox items (--unread / --all)
+reddi inbox watch          live-stream new items as they arrive
 reddi inbox mark-read      mark items read (--id repeatable, or --all)
 
 reddi comment <url>        post a top-level comment OR reply to a comment
@@ -110,7 +157,11 @@ reddi subs subscribe <name>     add subscription
 reddi subs unsubscribe <name>   remove subscription
 
 reddi flairs <sub>         list available flair templates for a sub
+reddi launch <config>      multi-stage declarative launch orchestrator
+reddi completion <shell>   emit bash/zsh/fish completion script
 ```
+
+Every command takes `--json` for scripting.
 
 ## Examples
 
@@ -128,11 +179,18 @@ reddi search "show & tell" --sub SideProject --sort new --limit 10
 # Reply to the comment a user just left on your launch post
 reddi comment https://reddit.com/r/x/comments/abc/title/def/ --body "thanks!"
 
-# Watch a post during a launch (Ctrl-C to stop)
-reddi watch https://reddit.com/r/SideProject/comments/abc123/...
+# Watch a post during a launch with notifications on removal
+reddi watch https://reddit.com/r/x/comments/abc/title/ \
+  --on-removal "osascript -e 'display notification \"removed\"'"
 
-# Mark every unread reply as read after a busy thread cooldown
-reddi inbox mark-read --all
+# Stream inbox replies live with a terminal bell on each
+reddi inbox watch --on-arrival "tput bel"
+
+# Validate a launch config without submitting
+reddi launch ~/launches/x/config.json --dry-run
+
+# Find your removed posts
+reddi history --json | jq '.[] | select(.removed) | .url'
 
 # Find a flair before posting
 reddi flairs MacApps
@@ -151,32 +209,22 @@ By default `reddi auth login` requests:
 
 Override with `--scope identity --scope submit` (repeatable) if you want to scope down.
 
-## v1.0 stability contract
+## v1.x stability contract
 
-The v1.0 surface is the stable contract: we will not break these commands or flag shapes within the 1.x line. The full list locked in v1.0:
-
-```text
-reddi auth (login|status|logout)
-reddi me
-reddi post
-reddi status <url-or-id>
-reddi watch <url-or-id>
-reddi inbox (list|mark-read)
-reddi comment <url-or-id>
-reddi search <query>
-reddi subs (list|info|subscribe|unsubscribe)
-reddi crosspost <url-or-id> --to <sub>
-reddi flairs <sub>
-```
-
-`--json` output shape is part of the contract too — JSON keys won't change incompatibly within 1.x. New fields may be added, existing fields won't disappear or change semantics.
+The v1.0 surface is stable: flag shapes and JSON keys won't change incompatibly within the 1.x line. v1.1 adds new commands (`launch`, `history`, `completion`, `inbox watch`) and new flags on existing commands (`watch --on-removal`, `watch --on-locked`) — no breaking changes.
 
 ## Roadmap
 
-- **v1.1** — `mod` commands for subreddit moderators (approve, remove, distinguish, lock, sticky)
-- **v1.2** — `launch` orchestration: declare a multi-sub launch in JSON, reddi runs the schedule (post-A-now, post-B-in-2h, watch-all-for-24h, alert-on-removal)
+- **v1.2** — `mod` commands for subreddit moderators (approve, remove, distinguish, lock, sticky)
 - **v1.3** — TUI mode (`reddi tui`) for browsing
 - **v2.0** — Possible Go rewrite for single-binary distribution via Homebrew
+
+## Related projects
+
+- **[reddix](https://github.com/ck-zhang/reddix)** (~941★) — Reddit TUI for browsing. Different goal: replacing the browser as a reader. reddi targets posting/monitoring; reddix targets reading.
+- **[rdt-cli](https://github.com/public-clis/rdt-cli)** (~366★) — terminal feed reader with light interaction.
+- **[bdfr](https://github.com/Serene-Arc/bulk-downloader-for-reddit)** — bulk downloader for Reddit content (archival).
+- **[PRAW](https://github.com/praw-dev/praw)** — the Python Reddit API Wrapper. reddi is built on top of it.
 
 ## Contributing
 
@@ -192,7 +240,7 @@ CI runs ruff + pytest on Python 3.9 / 3.10 / 3.11 / 3.12.
 
 ## Why this exists in 2026
 
-After the 2023 API pricing event there's a gap: no `gh`-equivalent for Reddit. PRAW is excellent as a library but doesn't give you a CLI. The popular TUIs (`rtv`, `tuir`) targeted browsing, not the launch/manage workflow that solopreneurs and indie devs actually need. `reddi` fills that gap — small, focused, stable, and shaped around the actual workflow rather than the API surface.
+After Reddit's 2023 API pricing change killed Apollo, Reddit is Fun, BaconReader, `rtv`, and `tuir`, the Reddit-tooling ecosystem reset. The browsing-CLI niche has filled back in (reddix, rdt-cli, reddit-tui), but the *workflow* niche — for people who use Reddit to launch things — has stayed empty. PRAW is excellent as a library but doesn't give you a CLI; existing TUIs target reading, not posting. `reddi` fills that workflow gap.
 
 ## License
 

@@ -41,6 +41,10 @@ def test_help_lists_every_v1_command() -> None:
         "subs",
         "crosspost",
         "flairs",
+        # v1.1 additions:
+        "history",
+        "launch",
+        "completion",
     ):
         assert cmd in result.output, f"command '{cmd}' missing from top-level help"
 
@@ -58,6 +62,7 @@ def test_each_command_help_loads() -> None:
         ["inbox", "--help"],
         ["inbox", "list", "--help"],
         ["inbox", "mark-read", "--help"],
+        ["inbox", "watch", "--help"],
         ["comment", "--help"],
         ["search", "--help"],
         ["subs", "--help"],
@@ -65,6 +70,10 @@ def test_each_command_help_loads() -> None:
         ["subs", "info", "--help"],
         ["crosspost", "--help"],
         ["flairs", "--help"],
+        # v1.1:
+        ["history", "--help"],
+        ["launch", "--help"],
+        ["completion", "--help"],
     ):
         result = runner.invoke(cli, cmd)
         assert result.exit_code == 0, f"--help failed for: {' '.join(cmd)}"
@@ -239,3 +248,121 @@ def test_search_rejects_invalid_time() -> None:
     runner = CliRunner()
     result = runner.invoke(cli, ["search", "anything", "--time", "decade"])
     assert result.exit_code == 2
+
+
+# ---------- v1.1 features ----------
+
+def test_completion_emits_bash_script() -> None:
+    """`reddi completion bash` should emit something that looks like a bash completion."""
+    runner = CliRunner()
+    result = runner.invoke(cli, ["completion", "bash"])
+    assert result.exit_code == 0
+    # Click bash-completion sources contain a function definition or a complete call
+    assert "_reddi" in result.output.lower() or "complete -" in result.output
+
+
+def test_completion_rejects_invalid_shell() -> None:
+    runner = CliRunner()
+    result = runner.invoke(cli, ["completion", "powershell"])
+    assert result.exit_code == 2
+
+
+def test_launch_dry_run_validates_config(tmp_path) -> None:
+    """A valid launch config should produce a plan output without submitting."""
+    import json
+
+    body = tmp_path / "post.md"
+    body.write_text("# hello\n\nBody text here.\n")
+    config = tmp_path / "launch.json"
+    config.write_text(
+        json.dumps(
+            {
+                "name": "test launch",
+                "stages": [
+                    {
+                        "sub": "test",
+                        "title": "smoke",
+                        "body_file": "post.md",
+                        "delay_seconds": 0,
+                    },
+                    {
+                        "sub": "r/SideProject",
+                        "title": "smoke 2",
+                        "body": "inline body",
+                        "delay_seconds": 7200,
+                    },
+                ],
+                "watch_after": False,
+            }
+        )
+    )
+    runner = CliRunner()
+    result = runner.invoke(cli, ["launch", str(config), "--dry-run"])
+    assert result.exit_code == 0
+    assert "test launch" in result.output
+    assert "r/test" in result.output
+    assert "r/SideProject" in result.output
+    assert "+0s" in result.output
+    assert "+7200s" in result.output
+
+
+def test_launch_rejects_missing_body_file(tmp_path) -> None:
+    import json
+
+    config = tmp_path / "launch.json"
+    config.write_text(
+        json.dumps(
+            {
+                "name": "broken",
+                "stages": [{"sub": "test", "title": "x", "body_file": "missing.md"}],
+            }
+        )
+    )
+    runner = CliRunner()
+    result = runner.invoke(cli, ["launch", str(config), "--dry-run"])
+    assert result.exit_code == 2
+
+
+def test_launch_rejects_empty_stages(tmp_path) -> None:
+    import json
+
+    config = tmp_path / "launch.json"
+    config.write_text(json.dumps({"name": "empty", "stages": []}))
+    runner = CliRunner()
+    result = runner.invoke(cli, ["launch", str(config), "--dry-run"])
+    assert result.exit_code == 2
+
+
+def test_launch_rejects_invalid_json(tmp_path) -> None:
+    config = tmp_path / "launch.json"
+    config.write_text("{not valid json")
+    runner = CliRunner()
+    result = runner.invoke(cli, ["launch", str(config), "--dry-run"])
+    assert result.exit_code == 2
+
+
+def test_launch_resolves_body_file_relative_to_config(tmp_path) -> None:
+    """body_file paths are resolved against the config dir, not cwd."""
+    import json
+    import os
+
+    sub = tmp_path / "subdir"
+    sub.mkdir()
+    (sub / "p.md").write_text("body content")
+    config = sub / "launch.json"
+    config.write_text(
+        json.dumps(
+            {"name": "rel-test", "stages": [{"sub": "test", "title": "x", "body_file": "p.md"}]}
+        )
+    )
+
+    # Run from cwd != config dir to prove path resolution is config-relative
+    cwd_before = os.getcwd()
+    try:
+        os.chdir(tmp_path)  # one level above config dir
+        runner = CliRunner()
+        result = runner.invoke(cli, ["launch", str(config), "--dry-run"])
+        assert result.exit_code == 0
+        assert "12 chars" in result.output  # len("body content") == 12
+    finally:
+        os.chdir(cwd_before)

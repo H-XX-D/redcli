@@ -12,9 +12,12 @@ import click
 from . import __version__
 from .commands.auth_cmd import auth_group
 from .commands.comment import comment as comment_cmd
+from .commands.completion import completion as completion_cmd
 from .commands.crosspost import crosspost as crosspost_cmd
 from .commands.flairs import flairs as flairs_cmd
+from .commands.history import history as history_cmd
 from .commands.inbox import inbox_group
+from .commands.launch import launch as launch_cmd
 from .commands.me import me as me_cmd
 from .commands.post import post as post_cmd
 from .commands.search import search as search_cmd
@@ -52,9 +55,12 @@ def cli() -> None:
 
 cli.add_command(auth_group)
 cli.add_command(comment_cmd)
+cli.add_command(completion_cmd)
 cli.add_command(crosspost_cmd)
 cli.add_command(flairs_cmd)
+cli.add_command(history_cmd)
 cli.add_command(inbox_group)
+cli.add_command(launch_cmd)
 cli.add_command(me_cmd)
 cli.add_command(post_cmd)
 cli.add_command(search_cmd)

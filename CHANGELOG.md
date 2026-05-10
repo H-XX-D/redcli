@@ -2,6 +2,27 @@
 
 All notable changes to `reddi` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and `reddi` adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] — 2026-05-10
+
+The "efficiency amplifier" release. Five new commands designed around the insight that reddi's value isn't "another Reddit CLI" — it's making the Reddit launch/monitor loop substantially faster than the browser.
+
+### Added
+
+- **`reddi completion <bash|zsh|fish>`** — emit shell completion scripts. After install, `reddi <TAB>` completes commands and `reddi auth <TAB>` completes subcommands. Click 8 native; supports bash, zsh, and fish.
+- **`reddi launch <config.json>`** — declarative multi-stage launch orchestration. Describe a launch as JSON (sequence of stages with delays, optional post-launch watch period with shell-command hooks for state changes), and reddi runs the whole sequence. Supports `--dry-run` for plan validation, JSON-lines log file, and `on_removal` / `on_locked` shell-command hooks. The big v1.x feature.
+- **`reddi history`** — list your own recent submissions with current vote/comment/removed/locked state. Supports `--sort new|top|hot|controversial` and `--limit`. Pipe to `jq` to filter (e.g., find your removed posts: `reddi history --json | jq '.[] | select(.removed)'`).
+- **`reddi inbox watch`** — live-stream new inbox items as they arrive (PRAW long-poll inbox stream). Supports `--mark-read` and `--on-arrival "shell command"` for terminal bell, notifications, or webhooks. Useful during a launch when you want comment replies to surface in real time.
+- **`reddi watch --on-removal` / `--on-locked`** — fire a shell command exactly once when a watched post transitions to removed or locked. The post URL is passed via `$REDDI_POST_URL`. Lets you pipe to `osascript`, `notify-send`, Slack webhooks, etc.
+
+### Changed
+
+- User-Agent string bumped to `reddi/1.1 (https://github.com/H-XX-D/reddi)`.
+- README rewritten to lead with the efficiency angle. The pitch is no longer "modern Reddit CLI" but "turns the launch loop from 90 minutes of tab-switching into 20 minutes of terminal commands."
+
+### v1.x stability contract
+
+All v1.0 flag shapes and JSON keys remain stable. v1.1 only adds new commands and new flags on existing commands — no breaking changes.
+
 ## [1.0.0] — 2026-05-10
 
 ### Added
@@ -54,5 +75,6 @@ Initial release.
 - `reddi status <url-or-id>` — vote/comment/removed-state for a post.
 - `reddi watch <url-or-id>` — live-updating dashboard for monitoring a launch.
 
+[1.1.0]: https://github.com/H-XX-D/reddi/releases/tag/v1.1.0
 [1.0.0]: https://github.com/H-XX-D/reddi/releases/tag/v1.0.0
 [0.1.0]: https://github.com/H-XX-D/reddi/releases/tag/v0.1.0
