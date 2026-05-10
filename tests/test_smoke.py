@@ -54,14 +54,16 @@ def test_post_url_and_body_mutually_exclusive() -> None:
         ["post", "--sub", "test", "--title", "x", "--url", "https://example.com", "--body", "hi"],
     )
     assert result.exit_code == 2
-    assert "mutually exclusive" in result.output.lower() or "mutually exclusive" in (result.stderr or "").lower()
+    haystack = (result.output + (result.stderr or "")).lower()
+    assert "mutually exclusive" in haystack
 
 
 def test_sub_strips_r_prefix() -> None:
-    """`--sub r/SideProject` and `--sub SideProject` should behave identically in dry-run."""
+    """`--sub r/SideProject` and `--sub SideProject` behave identically in dry-run."""
     runner = CliRunner()
-    r1 = runner.invoke(cli, ["post", "--sub", "r/test", "--title", "t", "--body", "b", "--dry-run", "--json"])
-    r2 = runner.invoke(cli, ["post", "--sub", "test", "--title", "t", "--body", "b", "--dry-run", "--json"])
+    common = ["post", "--title", "t", "--body", "b", "--dry-run", "--json"]
+    r1 = runner.invoke(cli, [*common, "--sub", "r/test"])
+    r2 = runner.invoke(cli, [*common, "--sub", "test"])
     assert r1.exit_code == 0 and r2.exit_code == 0
     assert '"sub": "test"' in r1.output
     assert '"sub": "test"' in r2.output

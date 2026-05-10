@@ -177,7 +177,7 @@ def login(client_id: str, scopes: list[str] | None = None, port: int = 8080) -> 
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
 
-    print(f"\nOpening browser to authorize redcli...")
+    print("\nOpening browser to authorize redcli...")
     print(f"If the browser doesn't open, visit:\n  {auth_url}\n")
     webbrowser.open(auth_url)
 

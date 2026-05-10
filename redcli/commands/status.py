@@ -9,7 +9,6 @@ import click
 from .. import auth
 from .. import output as out
 
-
 _SUBMISSION_ID_RE = re.compile(r"/comments/([a-z0-9]+)")
 
 
