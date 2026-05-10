@@ -14,7 +14,6 @@ import http.server
 import json
 import os
 import secrets
-import socket
 import sys
 import threading
 import urllib.parse
@@ -100,18 +99,6 @@ def get_authed_reddit() -> praw.Reddit:
 
 
 # ---------- OAuth login flow ----------
-
-def _find_free_port() -> int:
-    """Reddit's installed-app config requires a literal redirect_uri. We bind
-    to localhost on whatever free port the OS gives us, then construct the
-    redirect_uri using that port. The user must register http://localhost:PORT
-    as a valid redirect_uri in their Reddit app settings — but Reddit accepts
-    any port if the registered URI uses a wildcard, and most users register
-    http://localhost:8080 by convention."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
-
 
 class _OAuthCallbackHandler(http.server.BaseHTTPRequestHandler):
     """One-shot HTTP handler that captures the OAuth code from the redirect."""
