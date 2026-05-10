@@ -138,18 +138,26 @@ class _OAuthCallbackHandler(http.server.BaseHTTPRequestHandler):
         pass
 
 
-def login(client_id: str, scopes: list[str] | None = None, port: int = 16180) -> Credentials:
+def login(
+    client_id: str,
+    scopes: list[str] | None = None,
+    port: int = 16180,
+    host: str = "localhost",
+) -> Credentials:
     """Run the OAuth dance and return persisted Credentials.
 
     The user must have created an "installed app" at https://www.reddit.com/prefs/apps
-    with redirect_uri = http://localhost:{port}/. We default port=16180 (the first
-    five digits of the golden ratio) — it's unregistered, well clear of common
-    dev-tool collisions on 8080/3000/5000, and below the OS ephemeral-port range
-    so it won't get randomly bumped by outbound TCP connections.
+    with redirect_uri = http://{host}:{port}/. We default host=localhost and
+    port=16180 (the first five digits of the golden ratio) — unregistered port,
+    clear of common 8080/3000/5000 collisions, below the OS ephemeral range.
+
+    If Reddit rejects `localhost` (some accounts hit a "must be non-localhost"
+    policy check), pass --host 127.0.0.1 instead — same loopback address,
+    accepted universally.
     """
     scopes = scopes or DEFAULT_SCOPES
     state = secrets.token_urlsafe(16)
-    redirect_uri = f"http://localhost:{port}/"
+    redirect_uri = f"http://{host}:{port}/"
 
     # Build a not-yet-authenticated PRAW client just to get the auth URL
     reddit = praw.Reddit(

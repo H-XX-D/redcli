@@ -25,8 +25,17 @@ def auth_group() -> None:
     show_default=True,
     help="OAuth callback port. Default 16180 avoids the common 8080/3000/5000 collisions.",
 )
+@click.option(
+    "--host",
+    default="localhost",
+    show_default=True,
+    help=(
+        "OAuth callback host. Use 127.0.0.1 if Reddit rejects 'localhost' "
+        "(some accounts hit a non-localhost policy)."
+    ),
+)
 @click.option("--scope", "scopes", multiple=True, help="Override default scopes (repeatable).")
-def login(client_id: str | None, port: int, scopes: tuple[str, ...]) -> None:
+def login(client_id: str | None, port: int, host: str, scopes: tuple[str, ...]) -> None:
     """Authenticate with Reddit via browser-based OAuth.
 
     \b
@@ -35,8 +44,8 @@ def login(client_id: str | None, port: int, scopes: tuple[str, ...]) -> None:
       2. Click "create another app..."
       3. Choose type: "installed app"
       4. Set redirect uri to: http://localhost:16180/
-         (16180 is φ × 10000 — chosen to avoid 8080's collision-heavy
-          territory. Use --port to pick a different one.)
+         (or http://127.0.0.1:16180/ if Reddit rejects localhost — pass
+          --host 127.0.0.1 to match)
       5. Copy the client ID (the string under the app name)
       6. Run: reddi auth login --client-id YOUR_CLIENT_ID
 
@@ -52,7 +61,7 @@ def login(client_id: str | None, port: int, scopes: tuple[str, ...]) -> None:
 
     scope_list = list(scopes) if scopes else None
     try:
-        creds = auth.login(client_id=client_id, scopes=scope_list, port=port)
+        creds = auth.login(client_id=client_id, scopes=scope_list, port=port, host=host)
     except RuntimeError as e:
         out.err(str(e))
         raise SystemExit(1) from e
