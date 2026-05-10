@@ -19,7 +19,12 @@ def auth_group() -> None:
     envvar="REDDIT_CLIENT_ID",
     help="Reddit installed-app client ID. Register at https://www.reddit.com/prefs/apps",
 )
-@click.option("--port", default=8080, show_default=True, help="OAuth callback port.")
+@click.option(
+    "--port",
+    default=16180,
+    show_default=True,
+    help="OAuth callback port. Default 16180 avoids the common 8080/3000/5000 collisions.",
+)
 @click.option("--scope", "scopes", multiple=True, help="Override default scopes (repeatable).")
 def login(client_id: str | None, port: int, scopes: tuple[str, ...]) -> None:
     """Authenticate with Reddit via browser-based OAuth.
@@ -29,7 +34,9 @@ def login(client_id: str | None, port: int, scopes: tuple[str, ...]) -> None:
       1. Go to https://www.reddit.com/prefs/apps
       2. Click "create another app..."
       3. Choose type: "installed app"
-      4. Set redirect uri to: http://localhost:8080/
+      4. Set redirect uri to: http://localhost:16180/
+         (16180 is φ × 10000 — chosen to avoid 8080's collision-heavy
+          territory. Use --port to pick a different one.)
       5. Copy the client ID (the string under the app name)
       6. Run: redcli auth login --client-id YOUR_CLIENT_ID
 

@@ -25,7 +25,7 @@ def cli() -> None:
 
       \b
       1. Register an "installed app" at https://www.reddit.com/prefs/apps
-         (redirect URI: http://localhost:8080/)
+         (redirect URI: http://localhost:16180/)
       2. redcli auth login --client-id YOUR_CLIENT_ID
       3. redcli me  # confirm it works
 

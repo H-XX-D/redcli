@@ -151,12 +151,14 @@ class _OAuthCallbackHandler(http.server.BaseHTTPRequestHandler):
         pass
 
 
-def login(client_id: str, scopes: list[str] | None = None, port: int = 8080) -> Credentials:
+def login(client_id: str, scopes: list[str] | None = None, port: int = 16180) -> Credentials:
     """Run the OAuth dance and return persisted Credentials.
 
     The user must have created an "installed app" at https://www.reddit.com/prefs/apps
-    with redirect_uri = http://localhost:{port}/. We default port=8080 because
-    that's the convention the docs tell users to register.
+    with redirect_uri = http://localhost:{port}/. We default port=16180 (the first
+    five digits of the golden ratio) — it's unregistered, well clear of common
+    dev-tool collisions on 8080/3000/5000, and below the OS ephemeral-port range
+    so it won't get randomly bumped by outbound TCP connections.
     """
     scopes = scopes or DEFAULT_SCOPES
     state = secrets.token_urlsafe(16)

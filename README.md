@@ -33,7 +33,8 @@ Reddit requires an "installed app" registration before you can authenticate. Thi
 2. Click **"create another app..."** at the bottom
 3. Choose type: **"installed app"**
 4. Name: anything (e.g. `redcli-yourusername`)
-5. Redirect URI: `http://localhost:8080/`
+5. Redirect URI: `http://localhost:16180/`
+   *(16180 is the first five digits of the golden ratio — picked deliberately to avoid the heavy collision traffic on the more common 8080/3000/5000. Use `--port` to override if you have something on 16180.)*
 6. Click **"create app"**
 7. Copy the client ID — it's the short string under your app's name (NOT the longer "secret" field)
 
